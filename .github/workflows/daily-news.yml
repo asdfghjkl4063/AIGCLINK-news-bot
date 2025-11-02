@@ -1,35 +1,48 @@
-name: Daily AIGC News
+name: Daily News Push
 
 on:
   schedule:
-    # 每天UTC时间1点运行（北京时间上午9点）
+    # 每天北京时间早上9点运行 (UTC+8)
     - cron: '0 1 * * *'
   workflow_dispatch:  # 允许手动触发
 
 jobs:
-  crawl-and-notify:
+  push-news:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
       
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
         
-    - name: Install dependencies
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y chromium-browser chromium-chromedriver
+        
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install selenium
         
-    - name: Run news crawler
+    - name: Run news crawler and push to Feishu
       env:
         FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-      run: python news_crawler.py
-      
-    - name: Notify completion
-      if: always()
       run: |
-        echo "News crawling job completed at $(date)"
+        python news_crawler.py
+        
+    - name: Upload debug files on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: debug-files
+        path: |
+          debug_*.html
+          debug_*.png
+          debug_*.txt
+        retention-days: 1
